@@ -24,6 +24,7 @@ class Settings():
     self.time_before_logout = 3600
     self.graceful_exit = False
     self.hearthstone_location = None
+    self.fishbite_sound_path = "FishBite.ogg"
 
     self.templates = []
     

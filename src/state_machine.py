@@ -1,8 +1,11 @@
 import time, sys, os
 import random
+import threading
+import concurrent.futures
 import pyautogui as pag
 from bob_finder import search_and_destroy
 from splash_detector import seek_splash
+from sound_detector import seek_sound
 from setup import initialize, get_single_loc
 from clicker import bait
 from settings import Settings
@@ -80,9 +83,31 @@ def hover_bob():
   move_state(wait_for_splash)
 
 def wait_for_splash():
-  logger.info("Waiting for splash...")
-  if seek_splash(config, current_bob_box):
-    time.sleep(random.random()+.5)
+  logger.info("Waiting for splash (visual + sound)...")
+  stop_event = threading.Event()
+
+  def _splash():
+    result = seek_splash(config, current_bob_box)
+    stop_event.set()
+    return result
+
+  def _sound():
+    result = seek_sound(config.fishbite_sound_path, stop_event)
+    stop_event.set()
+    return result
+
+  with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    splash_future = executor.submit(_splash)
+    sound_future = executor.submit(_sound)
+    # Block until the first detector fires
+    done, _ = concurrent.futures.wait(
+      [splash_future, sound_future],
+      return_when=concurrent.futures.FIRST_COMPLETED
+    )
+
+  detected = any(f.result() for f in done)
+  if detected:
+    time.sleep(random.random() + .5)
     pag.rightClick()
     move_state(loot_fish)
 
